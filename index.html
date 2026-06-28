@@ -185,10 +185,6 @@ const $=id=>document.getElementById(id);
 function load(){
   try{const r=localStorage.getItem(LS); if(r) state.entries=JSON.parse(r);}catch(e){}
   try{const u=localStorage.getItem(LS_URL); if(u) state.sheetUrl=u;}catch(e){}
-  if(!state.entries.length) state.entries=[
-    {date:'2026-06-26',mood:4,cycleDay:'',sleep:'',throat:1,bodyCond:1,alcohol:0,depas:false,exercise:false,symptom:'',note:'宮本さんに会う前から元気だった'},
-    {date:'2026-06-27',mood:5,cycleDay:'',sleep:'',throat:0,bodyCond:0,alcohol:2,depas:false,exercise:true,symptom:'',note:'ヨガ→サウナ→ジンギスカン→シーシャ'},
-  ];
 }
 function save(){try{localStorage.setItem(LS,JSON.stringify(state.entries));}catch(e){}}
 
