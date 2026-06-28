@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>🌙 Mood Detective · 夜の帳</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230C0912'/%3E%3Ctext y='.9em' x='50' text-anchor='middle' font-size='62'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230C0912'/%3E%3Ctext y='.9em' x='50' text-anchor='middle' font-size='62'%3E%F0%9F%8C%99%3C/text%3E%3C/svg%3E" />
+<meta name="apple-mobile-web-app-title" content="🌙 Mood" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="theme-color" content="#0C0912" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Inter:wght@400;500;600;700&display=swap" />
+<script>window.__cjOK=false;</script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.3/chart.umd.min.js"
+  onload="window.__cjOK=true;window.__renderChart&&window.__renderChart();"
+  onerror="(function(){var s=document.createElement('script');s.defer=true;s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js';s.onload=function(){window.__cjOK=true;window.__renderChart&&window.__renderChart();};s.onerror=function(){var d=document.getElementById('debug');if(d){d.style.display='block';d.textContent='⚠ Chart.jsの読み込みに失敗（ブロッカー/ネットワーク）。グラフ以外は動きます。';}};document.head.appendChild(s);})()"></script>
+<style>
+  :root{
+    --ink:#0C0912; --ink2:#141021; --panel:#1A1530; --edge:#2A2247;
+    --ivory:#ECE4D4; --ivoryDim:#9A92A8;
+    --lav:#B5A4E6; --lavDim:#7E6FB0;
+    --neon:#74E6C8; --neon2:#E879B8; --amber:#E8C474; --danger:#E8718F; --violet:#C98FE6; --orange:#E8A574;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;min-height:100vh;background:radial-gradient(120% 80% at 50% -10%,#1c1535 0%,var(--ink) 60%);
+       color:var(--ivory);font-family:'Inter',system-ui,sans-serif;padding:22px 16px 56px;}
+  .wrap{max-width:720px;margin:0 auto;}
+  .eyebrow{font-size:11px;letter-spacing:.34em;text-transform:uppercase;color:var(--lavDim);font-weight:600;}
+  h1{font-family:'Cormorant Garamond',Georgia,serif;font-size:38px;line-height:1.05;font-weight:600;margin:6px 0 2px;letter-spacing:.01em;}
+  .sub{color:var(--ivoryDim);font-size:13px;max-width:560px;line-height:1.6;}
+  .sub em{color:var(--lav);font-style:normal;}
+  .panel{background:linear-gradient(180deg,var(--panel),var(--ink2));border:1px solid var(--edge);border-radius:16px;
+         padding:16px;margin-top:18px;box-shadow:0 10px 40px -20px rgba(0,0,0,.8);}
+  .ptitle{font-size:11px;letter-spacing:.28em;text-transform:uppercase;color:var(--lav);font-weight:600;margin-bottom:12px;
+          display:flex;justify-content:space-between;align-items:center;}
+  .status{letter-spacing:0;text-transform:none;font-weight:400;font-size:11.5px;color:var(--ivoryDim);}
+  label.l{font-size:11px;color:var(--ivoryDim);letter-spacing:.06em;margin:0 0 6px;display:block;}
+  input,textarea{width:100%;background:var(--ink);border:1px solid var(--edge);border-radius:10px;color:var(--ivory);
+                 padding:9px 11px;font-size:14px;outline:none;font-family:inherit;}
+  textarea{resize:vertical;}
+  input:focus,textarea:focus{outline:2px solid var(--neon);outline-offset:2px;}
+  .row{display:flex;gap:8px;flex-wrap:wrap;}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .chip{padding:7px 11px;border-radius:10px;font-size:12.5px;cursor:pointer;border:1px solid var(--edge);
+        background:transparent;color:var(--ivoryDim);transition:all .15s;user-select:none;}
+  .chip.on{color:var(--ivory);font-weight:600;}
+  .gap{height:14px;}
+  .primary{width:100%;margin-top:14px;padding:12px;border-radius:12px;border:none;cursor:pointer;
+           background:linear-gradient(90deg,var(--lav),var(--neon2));color:var(--ink);font-weight:700;font-size:14px;letter-spacing:.04em;}
+  .ghost{background:var(--edge);color:var(--ivory);}
+  .fc{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .fcell{background:var(--ink);border:1px solid var(--edge);border-radius:12px;padding:10px 8px;text-align:center;}
+  .fcell.today{border-color:var(--lav);}
+  .fday{font-size:11px;color:var(--ivoryDim);font-weight:600;}
+  .flv{font-size:18px;font-weight:700;margin:4px 0;}
+  .fsm{font-size:10.5px;color:var(--ivoryDim);}
+  .note{color:var(--ivoryDim);font-size:12px;line-height:1.6;}
+  code{color:var(--lav);}
+  .rrow{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--edge);font-size:13.5px;}
+  .dot{width:8px;height:8px;border-radius:8px;flex-shrink:0;}
+  .lrow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--edge);font-size:13px;}
+  .ldate{width:44px;color:var(--lav);font-weight:600;}
+  .lmood{width:22px;text-align:center;font-weight:700;}
+  .ldesc{flex:1;color:var(--ivoryDim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .del{background:none;border:none;color:var(--ivoryDim);cursor:pointer;font-size:12px;}
+  .foot{text-align:center;color:var(--lavDim);font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;margin-top:22px;}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">気分の波 · 検証＆予報ボード</div>
+  <h1>Mood Detective</h1>
+  <p class="sub">気圧は自動取得（小田原・Open-Meteo）。あなたが打つのは気分くらいでいい。
+  記録から<em>容疑者</em>を割り出し、気圧と周期から数日先の<em>コンディション予報</em>を出す。</p>
+  <p id="debug" style="display:none;color:#E8718F;font-size:12px;margin:8px 0 0;line-height:1.5;"></p>
+
+  <!-- FORECAST -->
+  <div class="panel">
+    <div class="ptitle"><span>コンディション予報</span><span id="pxStatus" class="status">気圧取得中…</span></div>
+    <div id="forecast" class="fc"></div>
+    <p id="fcNote" class="note" style="margin:12px 0 0;"></p>
+  </div>
+
+  <!-- INPUT -->
+  <div class="panel">
+    <div class="ptitle"><span>今日を記録する</span></div>
+    <label class="l">日付</label>
+    <input type="date" id="inDate" />
+    <div class="gap"></div>
+    <label class="l">気分</label>
+    <div class="row" id="moodRow"></div>
+    <div class="grid2" style="margin-top:14px;">
+      <div><label class="l">周期日（橋ができたら自動）</label><input type="number" id="inCycle" placeholder="例 14" /></div>
+      <div><label class="l">睡眠 h</label><input type="number" step="0.5" id="inSleep" placeholder="例 6.5" /></div>
+    </div>
+    <div class="gap"></div>
+    <label class="l">喉の違和感</label><div class="row" id="throatRow"></div>
+    <div class="gap"></div>
+    <label class="l">体調の重さ（メンタル以外・だるさや不調）</label><div class="row" id="bodyRow"></div>
+    <div class="gap"></div>
+    <label class="l">飲酒</label><div class="row" id="alcRow"></div>
+    <div class="gap"></div>
+    <label class="l">その日のこと</label>
+    <div class="row"><div class="chip" id="depasBtn">デパス</div><div class="chip" id="exBtn">運動</div><div class="chip" id="periodBtn">🩸 生理初日</div></div>
+    <div class="gap"></div>
+    <label class="l">症状メモ（頭痛・生理痛・むくみ など）</label>
+    <input id="inSymptom" placeholder="気になる体の症状" />
+    <div class="gap"></div>
+    <label class="l">メモ（任意）</label>
+    <input id="inNote" placeholder="ひとこと" />
+    <button class="primary" id="saveBtn">この日を保存（同じ日付は上書き）</button>
+    <p id="writeStatus" class="note" style="margin:8px 0 0;text-align:center;"></p>
+  </div>
+
+  <!-- CHART -->
+  <div class="panel">
+    <div class="ptitle"><span>気分 × 容疑者</span></div>
+    <div class="row" id="overlayRow" style="margin-bottom:12px;"></div>
+    <div style="position:relative;height:280px;"><canvas id="chart"></canvas></div>
+    <p id="chartEmpty" class="note" style="display:none;">記録が2日分になるとグラフが出ます。</p>
+  </div>
+
+  <!-- RANKING -->
+  <div class="panel">
+    <div class="ptitle"><span>容疑者ランキング（相関）</span></div>
+    <p class="note" style="margin:-4px 0 14px;">+は「高い日ほど気分が良い」、−は「高い日ほど下がる」。信頼できるのは
+      <span style="color:var(--amber)">2〜3週間</span> 溜まってから。</p>
+    <div id="ranking"></div>
+    <div id="rankCat" class="note" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--edge);line-height:1.7;"></div>
+  </div>
+
+  <!-- SHEET SYNC -->
+  <div class="panel">
+    <div class="ptitle"><span>ヘルスケア連携</span><span id="syncStatus" class="status">未接続</span></div>
+    <p class="note" style="margin:-4px 0 10px;">GASの <code>/exec</code> URL（または公開CSV URL）を貼ると、開くたびに自動で読む。</p>
+    <input id="inSheet" placeholder="https://script.google.com/.../exec" />
+    <button class="primary" id="syncBtn" style="background:linear-gradient(90deg,var(--lavDim),var(--neon));">シートを同期（追加・更新を反映）</button>
+    <button class="primary ghost" id="reloadBtn" style="margin-top:8px;">シートから読み直す（ローカルを置き換え）</button>
+    <div style="height:18px;border-top:1px solid var(--edge);margin-top:18px;"></div>
+    <p class="note" style="margin-bottom:10px;">手貼り用（予備）。1行1日：<br>
+      <code>2026-06-25, cycle=12, depas=1, sleep=6.5, alcohol=1, body=2</code></p>
+    <textarea id="inPaste" style="height:70px;font-family:monospace;font-size:12px;" placeholder="ここに貼り付け"></textarea>
+    <button class="primary ghost" id="pasteBtn">貼り付けを取り込む</button>
+  </div>
+
+  <!-- LOG -->
+  <div class="panel" id="logPanel">
+    <div class="ptitle"><span id="logTitle">記録</span></div>
+    <div id="log"></div>
+  </div>
+
+  <div class="foot">結ノ舎 · 夜の帳 system</div>
+</div>
+
+<script>
+"use strict";
+window.onerror=function(m,src,l){var d=document.getElementById('debug');if(d){d.style.display='block';d.textContent='\u26A0 '+m+' (line '+l+')';}return false;};
+const LAT=35.2646, LON=139.1533;
+const C={lav:'#B5A4E6',neon:'#74E6C8',neon2:'#E879B8',amber:'#E8C474',danger:'#E8718F',violet:'#C98FE6',orange:'#E8A574',ivoryDim:'#9A92A8',edge:'#2A2247',ink2:'#141021',ivory:'#ECE4D4'};
+const SUSPECTS=[
+  {id:'pressure',short:'気圧',label:'気圧 (hPa)',color:C.neon},
+  {id:'pressureChange',short:'気圧変化',label:'気圧の前日差',color:C.neon2},
+  {id:'cycleDay',short:'周期',label:'周期日',color:C.amber},
+  {id:'sleep',short:'睡眠',label:'睡眠 (時間)',color:'#8FB7E8'},
+  {id:'throat',short:'喉',label:'喉の違和感 (0–3)',color:C.danger},
+  {id:'bodyCond',short:'体調',label:'体調の重さ (0–3)',color:C.violet},
+  {id:'alcohol',short:'飲酒',label:'飲酒量 (0–3)',color:C.orange},
+];
+const MOOD_LABELS=['','絶不調','低め','ふつう','good','絶好調'];
+const LS='moodDetective.v1', LS_URL='moodDetective.sheetUrl';
+
+let state={entries:[], sheetUrl:''};
+let pressureMap={}, overlay='pressure', chart=null;
+let draft={date:today(),mood:3,cycleDay:'',sleep:'',throat:0,bodyCond:0,alcohol:0,depas:false,exercise:false,periodStart:false,symptom:'',note:''};
+
+function localYMD(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function parseYMD(s){const p=String(s).split('-').map(Number);return new Date(p[0],(p[1]||1)-1,p[2]||1);}
+function today(){return localYMD(new Date());}
+function fmt(d){return localYMD(d);}
+const $=id=>document.getElementById(id);
+
+/* ---------- persistence ---------- */
+function load(){
+  try{const r=localStorage.getItem(LS); if(r) state.entries=JSON.parse(r);}catch(e){}
+  try{const u=localStorage.getItem(LS_URL); if(u) state.sheetUrl=u;}catch(e){}
+  if(!state.entries.length) state.entries=[
+    {date:'2026-06-26',mood:4,cycleDay:'',sleep:'',throat:1,bodyCond:1,alcohol:0,depas:false,exercise:false,symptom:'',note:'宮本さんに会う前から元気だった'},
+    {date:'2026-06-27',mood:5,cycleDay:'',sleep:'',throat:0,bodyCond:0,alcohol:2,depas:false,exercise:true,symptom:'',note:'ヨガ→サウナ→ジンギスカン→シーシャ'},
+  ];
+}
+function save(){try{localStorage.setItem(LS,JSON.stringify(state.entries));}catch(e){}}
+
+/* ---------- stats ---------- */
+function pearson(pairs){
+  const v=pairs.filter(p=>p[0]!=null&&p[1]!=null&&!isNaN(p[0])&&!isNaN(p[1]));
+  const n=v.length; if(n<3) return {r:null,n};
+  const mx=v.reduce((s,p)=>s+p[0],0)/n, my=v.reduce((s,p)=>s+p[1],0)/n;
+  let sxy=0,sxx=0,syy=0;
+  for(const [x,y] of v){sxy+=(x-mx)*(y-my);sxx+=(x-mx)**2;syy+=(y-my)**2;}
+  if(sxx===0||syy===0) return {r:null,n};
+  return {r:sxy/Math.sqrt(sxx*syy),n};
+}
+const strength=r=>{const a=Math.abs(r);return a>=.6?'強い':a>=.35?'中くらい':a>=.15?'弱い':'ほぼなし';};
+
+/* ---------- derived data ---------- */
+function periodStarts(){return state.entries.filter(e=>e.periodStart).map(e=>e.date).sort();}
+function cycleFor(date,explicit){
+  if(explicit!=null&&explicit!=='') return Number(explicit);
+  const st=periodStarts(); let s=null;
+  for(const sd of st){ if(sd<=date) s=sd; else break; }
+  if(!s) return null;
+  return Math.round((parseYMD(date)-parseYMD(s))/86400000)+1;
+}
+function rows(){
+  const sorted=[...state.entries].sort((a,b)=>a.date.localeCompare(b.date));
+  let prevP=null;
+  return sorted.map(e=>{
+    const p=pressureMap[e.date]??null;
+    const change=(p!=null&&prevP!=null)?+(p-prevP).toFixed(1):null;
+    if(p!=null) prevP=p;
+    return {...e,mood:Number(e.mood),pressure:p,pressureChange:change,
+      cycleDay:cycleFor(e.date,e.cycleDay),
+      sleep:e.sleep===''||e.sleep==null?null:Number(e.sleep),
+      throat:e.throat==null?null:Number(e.throat),
+      bodyCond:(e.bodyCond==null||e.bodyCond==='')?null:Number(e.bodyCond),
+      alcohol:(e.alcohol==null||e.alcohol==='')?null:Number(e.alcohol),
+      label:e.date.slice(5).replace('-','/')};
+  });
+}
+
+/* ---------- pressure ---------- */
+async function fetchPressure(){
+  try{
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${LAT}&longitude=${LON}&hourly=pressure_msl&past_days=14&forecast_days=3&timezone=Asia%2FTokyo`;
+    const j=await (await fetch(url)).json();
+    const t=j.hourly.time, v=j.hourly.pressure_msl, b={};
+    t.forEach((ti,i)=>{const d=ti.slice(0,10);(b[d]??=[]).push(v[i]);});
+    const m={};
+    for(const [d,arr] of Object.entries(b)){const ok=arr.filter(x=>x!=null);if(ok.length)m[d]=+(ok.reduce((a,c)=>a+c,0)/ok.length).toFixed(1);}
+    pressureMap=m; $('pxStatus').textContent='気圧 自動取得済'; $('pxStatus').style.color=C.neon;
+  }catch(e){ $('pxStatus').textContent='気圧取得に失敗'; $('pxStatus').style.color=C.danger; }
+  renderAll();
+}
+
+/* ---------- forecast ---------- */
+function buildForecast(){
+  const data=rows();
+  const learned=pearson(data.map(r=>[r.pressureChange,r.mood]));
+  const lastCyc=[...data].reverse().find(r=>r.cycleDay!=null);
+  const starts=periodStarts();
+  const days=[]; const start=new Date();
+  let prevP=pressureMap[fmt(new Date(start.getTime()-86400000))]??null;
+  for(let i=0;i<=3;i++){
+    const dt=new Date(start.getTime()+i*86400000), key=fmt(dt);
+    const p=pressureMap[key]??null;
+    const change=(p!=null&&prevP!=null)?+(p-prevP).toFixed(1):null;
+    if(p!=null) prevP=p;
+    let level='低', reason=[];
+    if(change!=null){
+      if(change<=-4){level='高';reason.push(`気圧が${change}hPaの急降下`);}
+      else if(change<=-1.5){level='中';reason.push(`気圧がやや低下(${change})`);}
+      else if(change>=3){reason.push(`気圧は回復傾向(+${change})`);}
+    }
+    let cyc=cycleFor(key,null);
+    if(cyc==null&&lastCyc){const d0=Math.round((dt-parseYMD(lastCyc.date))/86400000);cyc=lastCyc.cycleDay+d0;}
+    days.push({key,label:`${dt.getMonth()+1}/${dt.getDate()}`,p,change,level,cyc,isToday:i===0});
+  }
+  return {days,hasData:data.length>=5,learned:learned.r};
+}
+
+/* ---------- merge / import ---------- */
+function blank(date){return {date,mood:3,cycleDay:'',sleep:'',throat:0,bodyCond:0,alcohol:0,depas:false,exercise:false,periodStart:false,symptom:'',note:''};}
+function mergeRows(list){
+  if(!list||!list.length) return;
+  const map=Object.fromEntries(state.entries.map(e=>[e.date,{...e}]));
+  for(const r of list){
+    if(!r.date) continue;
+    const base=map[r.date]||blank(r.date);
+    if(r.mood!=null) base.mood=Number(r.mood);
+    if(r.start!=null) base.periodStart=!!r.start;
+    if(r.cycleDay!=null) base.cycleDay=String(r.cycleDay);
+    if(r.sleep!=null) base.sleep=String(r.sleep);
+    if(r.depas!=null) base.depas=!!r.depas;
+    if(r.alcohol!=null) base.alcohol=Number(r.alcohol);
+    if(r.bodyCond!=null) base.bodyCond=Number(r.bodyCond);
+    if(r.symptom) base.symptom=r.symptom;
+    map[r.date]=base;
+  }
+  state.entries=Object.values(map); save(); renderAll();
+}
+function pickDate(s){
+  if(s instanceof Date && !isNaN(s)) return localYMD(s);
+  const str=String(s);
+  if(/\d{4}-\d{2}-\d{2}T/.test(str)){ const d=new Date(str); if(!isNaN(d)) return localYMD(d); }
+  const m=str.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  return m?`${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`:null;}
+
+function parsePaste(text){
+  return text.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const date=pickDate(line); if(!date) return null;
+    const g=re=>{const m=line.match(re);return m?m[1]:null;};
+    return {date,mood:g(/mood\s*=\s*([1-5])/i),cycleDay:g(/cycle\s*=\s*(\d+)/i),sleep:g(/sleep\s*=\s*([\d.]+)/i),
+      depas:/depas\s*=\s*1/i.test(line)?1:(/depas\s*=\s*0/i.test(line)?0:null),
+      alcohol:g(/alcohol\s*=\s*(\d+)/i),bodyCond:g(/body\s*=\s*(\d+)/i),
+      start:/start\s*=\s*1/i.test(line)?1:null,symptom:g(/symptom\s*=\s*([^,]+)/i)};
+  }).filter(Boolean);
+}
+function tableToRows(matrix){
+  if(!matrix||matrix.length<2) return [];
+  const head=matrix[0].map(h=>String(h).trim().toLowerCase());
+  const idx=keys=>head.findIndex(h=>keys.some(k=>h.includes(k)));
+  let di=head.findIndex(h=>h.includes('日付')||h==='date'||h.includes('date'));
+  if(di<0) di=head.findIndex(h=>h.includes('タイムスタンプ')||h.includes('timestamp'));
+  const ci=idx(['cycle','周期']),si=idx(['sleep','睡眠']),
+        pi=idx(['depas','デパス','服薬']),ai=idx(['alcohol','飲酒']),bi=idx(['body','体調']),yi=idx(['symptom','症状']),
+        mi=idx(['mood','気分']),ti=idx(['start','生理開始','period start']);
+  return matrix.slice(1).map(c=>{
+    const date=di>=0?pickDate(c[di]):null; if(!date) return null;
+    const val=i=>(i>=0&&c[i]!=null)?String(c[i]).trim():null;
+    const dep=val(pi);
+    const st=val(ti); const md=val(mi);
+    return {date,mood:(md&&/[1-5]/.test(md))?md.match(/[1-5]/)[0]:null,cycleDay:val(ci),sleep:val(si),
+      depas:dep==null?null:(/^(1|true|はい|あり|taken)/i.test(dep)?1:0),
+      alcohol:val(ai),bodyCond:val(bi),
+      start:st==null?null:(/^(1|true|はい|あり)/i.test(st)?1:null),symptom:val(yi)};
+  }).filter(Boolean);
+}
+function csvToMatrix(text){return text.split(/\r?\n/).filter(l=>l.trim()).map(l=>l.split(','));}
+
+async function syncSheet(url){
+  const u=(url||state.sheetUrl||'').trim(); if(!u){return;}
+  $('syncStatus').textContent='同期中…'; $('syncStatus').style.color=C.ivoryDim;
+  try{
+    const txt=await (await fetch(u)).text();
+    let list;
+    try{ const j=JSON.parse(txt);              // GAS /exec → 2D array
+         list=tableToRows(Array.isArray(j[0])?j:j.values||[]); }
+    catch(_){ list=tableToRows(csvToMatrix(txt)); }  // published CSV
+    mergeRows(list);
+    state.sheetUrl=u; try{localStorage.setItem(LS_URL,u);}catch(e){}
+    $('syncStatus').textContent='同期済'; $('syncStatus').style.color=C.neon;
+  }catch(e){ $('syncStatus').textContent='読み込み失敗（URL/公開設定を確認）'; $('syncStatus').style.color=C.danger; }
+}
+
+
+/* ---------- reload: sheet becomes the single source of truth ---------- */
+async function reloadFromSheet(){
+  const u=(state.sheetUrl||'').trim();
+  if(!u){ $('syncStatus').textContent='URLを入れてから'; $('syncStatus').style.color=C.danger; return; }
+  if(!confirm('この端末のローカル記録を消して、シートの内容で置き換えます。よろしいですか？')) return;
+  $('syncStatus').textContent='読み直し中…'; $('syncStatus').style.color=C.ivoryDim;
+  try{
+    const txt=await (await fetch(u)).text();
+    let list;
+    try{ const j=JSON.parse(txt); list=tableToRows(Array.isArray(j[0])?j:j.values||[]); }
+    catch(_){ list=tableToRows(csvToMatrix(txt)); }
+    state.entries=[]; save();          // wipe local first
+    mergeRows(list);                    // rebuild purely from sheet
+    $('syncStatus').textContent='シートで置き換え完了 ✓'; $('syncStatus').style.color=C.neon;
+  }catch(e){ $('syncStatus').textContent='読み直し失敗（ローカルは保持）'; $('syncStatus').style.color=C.danger; }
+}
+
+/* ---------- write to sheet (GAS doPost) ---------- */
+function entryToPayload(e){
+  return {
+    "日付": e.date,
+    "気分": e.mood,
+    "睡眠": e.sleep===''||e.sleep==null?'':e.sleep,
+    "デパス": e.depas?1:0,
+    "飲酒": (e.alcohol==null||e.alcohol==='')?'':e.alcohol,
+    "体調": (e.bodyCond==null||e.bodyCond==='')?'':e.bodyCond,
+    "周期": e.cycleDay===''||e.cycleDay==null?'':e.cycleDay,
+    "症状": e.symptom||'',
+    "生理開始": e.periodStart?1:''
+  };
+}
+async function pushToSheet(entries){
+  const u=(state.sheetUrl||'').trim();
+  if(!u){ setWriteStatus('シート未接続（ローカルのみ保存）', C.ivoryDim); return; }
+  setWriteStatus('シートに保存中…', C.ivoryDim);
+  try{
+    for(const e of entries){
+      await fetch(u, {method:'POST', body:JSON.stringify(entryToPayload(e))});
+    }
+    setWriteStatus('シートに保存済 ✓', C.neon);
+  }catch(err){ setWriteStatus('シート保存に失敗（ローカルには保存済）', C.danger); }
+}
+function setWriteStatus(msg,color){ const el=$('writeStatus'); if(el){el.textContent=msg; el.style.color=color;} }
+
+/* ---------- render ---------- */
+function chip(text,on,color,onclick){
+  const d=document.createElement('div'); d.className='chip'+(on?' on':''); d.textContent=text;
+  if(on){d.style.borderColor=color;d.style.background=color+'22';}
+  d.onclick=onclick; return d;
+}
+function renderInput(){
+  $('inDate').value=draft.date;
+  const mr=$('moodRow'); mr.innerHTML='';
+  [1,2,3,4,5].forEach(m=>mr.appendChild(chip(m+'·'+MOOD_LABELS[m],draft.mood===m,C.lav,()=>{draft.mood=m;renderInput();})));
+  const tr=$('throatRow'); tr.innerHTML='';
+  [0,1,2,3].forEach(t=>tr.appendChild(chip(t===0?'なし':'★'.repeat(t),draft.throat===t,C.danger,()=>{draft.throat=t;renderInput();})));
+  const br=$('bodyRow'); br.innerHTML='';
+  ['絶好調','軽い','重め','しんどい'].forEach((lab,t)=>br.appendChild(chip(t+'·'+lab,draft.bodyCond===t,C.violet,()=>{draft.bodyCond=t;renderInput();})));
+  const ar=$('alcRow'); ar.innerHTML='';
+  ['なし','少し','ほどほど','多め'].forEach((lab,t)=>ar.appendChild(chip(t+'·'+lab,draft.alcohol===t,C.orange,()=>{draft.alcohol=t;renderInput();})));
+  const db=$('depasBtn'); db.className='chip'+(draft.depas?' on':''); db.textContent=draft.depas?'デパス飲んだ ✓':'デパス';
+  db.style.borderColor=draft.depas?C.neon2:C.edge; db.style.background=draft.depas?C.neon2+'22':'transparent';
+  const eb=$('exBtn'); eb.className='chip'+(draft.exercise?' on':''); eb.textContent=draft.exercise?'運動した ✓':'運動';
+  eb.style.borderColor=draft.exercise?C.amber:C.edge; eb.style.background=draft.exercise?C.amber+'22':'transparent';
+  const pb=$('periodBtn'); pb.className='chip'+(draft.periodStart?' on':''); pb.textContent=draft.periodStart?'🩸 生理初日 ✓':'🩸 生理初日';
+  pb.style.borderColor=draft.periodStart?C.danger:C.edge; pb.style.background=draft.periodStart?C.danger+'22':'transparent';
+}
+function renderForecast(){
+  const f=buildForecast(); const host=$('forecast'); host.innerHTML='';
+  const col=l=>l==='高'?C.danger:l==='中'?C.amber:C.neon;
+  f.days.forEach(d=>{
+    const el=document.createElement('div'); el.className='fcell'+(d.isToday?' today':'');
+    el.innerHTML=`<div class="fday" style="${d.isToday?'color:'+C.lav:''}">${d.isToday?'今日':d.label}</div>
+      <div class="flv" style="color:${col(d.level)}">${d.level}</div>
+      <div class="fsm">${d.p!=null?Math.round(d.p)+'hPa':'—'}</div>
+      <div class="fsm" style="${d.change!=null&&d.change<0?'color:'+C.neon2:''}">${d.change!=null?(d.change>0?'+':'')+d.change:''}</div>`;
+    host.appendChild(el);
+  });
+  $('fcNote').innerHTML='注意度は気圧の急降下を基準に算出（高＝予定を詰めすぎない日にすると吉）。'
+    +(f.hasData?'あなたの記録の傾向も参照中。':'記録が5日を超えると、あなた自身の傾向で精度が上がる。')
+    +(f.days.some(x=>x.cyc!=null)?' 周期は最後の入力からの概算。':'');
+}
+function renderChart(){
+  const data=rows(); const empty=$('chartEmpty');
+  if(typeof Chart==='undefined'){empty.style.display='block';empty.textContent='グラフ描画を読み込み中…';return;}
+  if(data.length<2){empty.style.display='block';empty.textContent='記録が2日分になるとグラフが出ます。';if(chart){chart.destroy();chart=null;}return;}
+  empty.style.display='none';
+  const sel=SUSPECTS.find(s=>s.id===overlay);
+  const cfg={
+    type:'line',
+    data:{labels:data.map(r=>r.label),datasets:[
+      {label:'気分',data:data.map(r=>r.mood),yAxisID:'y',borderColor:C.lav,backgroundColor:C.lav,
+       borderWidth:2.5,tension:.3,pointRadius:3,spanGaps:true},
+      {label:sel.short,data:data.map(r=>r[sel.id]),yAxisID:'y1',borderColor:sel.color,backgroundColor:sel.color,
+       borderWidth:2,borderDash:[4,3],tension:.3,pointRadius:2.5,spanGaps:true},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:C.ivory,font:{size:12}}},
+        tooltip:{backgroundColor:C.ink2,borderColor:C.edge,borderWidth:1,titleColor:C.lav,bodyColor:C.ivory}},
+      scales:{
+        x:{ticks:{color:C.ivoryDim,font:{size:11}},grid:{color:C.edge}},
+        y:{min:1,max:5,ticks:{stepSize:1,color:C.lav,font:{size:11}},grid:{color:C.edge}},
+        y1:{position:'right',ticks:{color:sel.color,font:{size:11}},grid:{drawOnChartArea:false}},
+      }}
+  };
+  if(chart){chart.data=cfg.data;chart.options=cfg.options;chart.update();}
+  else chart=new Chart($('chart'),cfg);
+}
+function renderOverlayRow(){
+  const host=$('overlayRow'); host.innerHTML='';
+  SUSPECTS.forEach(s=>host.appendChild(chip(s.short,overlay===s.id,s.color,()=>{overlay=s.id;renderOverlayRow();renderChart();})));
+}
+function renderRanking(){
+  const data=rows();
+  const out=SUSPECTS.map(s=>{const {r,n}=pearson(data.map(row=>[row[s.id],row.mood]));return {...s,r,n};});
+  out.sort((a,b)=>Math.abs(b.r??-1)-Math.abs(a.r??-1));
+  const host=$('ranking'); host.innerHTML='';
+  out.forEach(s=>{
+    const row=document.createElement('div'); row.className='rrow';
+    let right;
+    if(s.r==null) right=`<div style="font-size:12px;color:${C.ivoryDim}">データ不足（${s.n}/3日）</div>`;
+    else right=`<div style="font-size:12px;color:${C.ivoryDim}">${strength(s.r)}</div>
+      <div style="width:56px;text-align:right;font-weight:700;color:${s.r>0?C.neon:C.danger}">${s.r>0?'+':''}${s.r.toFixed(2)}</div>`;
+    row.innerHTML=`<div class="dot" style="background:${s.color}"></div><div style="flex:1">${s.label}</div>${right}`;
+    host.appendChild(row);
+  });
+  // categorical
+  const dep={yes:[],no:[]}; data.forEach(r=>dep[r.depas?'yes':'no'].push(r.mood));
+  const mean=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(1):'—';
+  const exR=pearson(data.map(r=>[r.exercise?1:0,r.mood])).r;
+  let cat='';
+  cat+= dep.yes.length?`デパス飲んだ日 平均 ${mean(dep.yes)} ／ 飲まない日 ${mean(dep.no)}<br>`:'デパスの比較は記録が溜まると出ます<br>';
+  if(exR!=null) cat+=`運動と気分：${exR>0?'+':''}${exR.toFixed(2)}`;
+  $('rankCat').innerHTML=cat;
+}
+function renderLog(){
+  const data=rows(); $('logTitle').textContent=`記録（${data.length}日）`;
+  const host=$('log'); host.innerHTML='';
+  [...data].reverse().forEach(e=>{
+    const desc=[e.pressure!=null?Math.round(e.pressure)+'hPa':null,e.periodStart?'🩸初日':null,e.cycleDay!=null?'周期'+e.cycleDay:null,
+      e.depas?'デパス':null,e.alcohol?'酒'+e.alcohol:null,e.bodyCond?'体調'+e.bodyCond:null,
+      e.throat?'喉'+e.throat:null,e.symptom||null,e.exercise?'運動':null,e.note].filter(Boolean).join(' · ');
+    const row=document.createElement('div'); row.className='lrow';
+    row.innerHTML=`<div class="ldate">${e.label}</div><div class="lmood">${e.mood}</div><div class="ldesc">${desc}</div>`;
+    const b=document.createElement('button'); b.className='del'; b.textContent='削除';
+    b.onclick=()=>{state.entries=state.entries.filter(x=>x.date!==e.date);save();renderAll();};
+    row.appendChild(b); host.appendChild(row);
+  });
+}
+function renderAll(){[renderForecast,renderChart,renderOverlayRow,renderRanking,renderLog].forEach(function(f){try{f();}catch(e){console.error(e);}});}
+
+/* ---------- events ---------- */
+function bind(){
+  $('inDate').onchange=e=>draft.date=e.target.value;
+  $('inCycle').oninput=e=>draft.cycleDay=e.target.value;
+  $('inSleep').oninput=e=>draft.sleep=e.target.value;
+  $('inSymptom').oninput=e=>draft.symptom=e.target.value;
+  $('inNote').oninput=e=>draft.note=e.target.value;
+  $('depasBtn').onclick=()=>{draft.depas=!draft.depas;renderInput();};
+  $('exBtn').onclick=()=>{draft.exercise=!draft.exercise;renderInput();};
+  $('periodBtn').onclick=()=>{draft.periodStart=!draft.periodStart;renderInput();};
+  $('saveBtn').onclick=()=>{
+    const saved={...draft};
+    state.entries=[...state.entries.filter(e=>e.date!==saved.date),saved];
+    save(); draft={...draft,note:'',symptom:'',periodStart:false}; $('inNote').value=''; $('inSymptom').value='';
+    renderAll();
+    pushToSheet([saved]);
+  };
+  $('inSheet').value=state.sheetUrl;
+  $('inSheet').oninput=e=>state.sheetUrl=e.target.value;
+  $('syncBtn').onclick=()=>syncSheet($('inSheet').value);
+  $('reloadBtn').onclick=()=>reloadFromSheet();
+  $('pasteBtn').onclick=()=>{
+    const list=parsePaste($('inPaste').value);
+    mergeRows(list);
+    $('inPaste').value='';
+    // push merged dates (with their now-current full values) to the sheet
+    const dates=new Set(list.map(r=>r.date));
+    const toPush=state.entries.filter(e=>dates.has(e.date));
+    pushToSheet(toPush);
+  };
+}
+
+/* ---------- init ---------- */
+window.__renderChart=function(){try{renderChart();}catch(e){}};
+load(); bind(); renderInput();
+try{renderAll();}catch(e){console.error(e);}
+fetchPressure();                              // runs regardless of chart state
+if(state.sheetUrl) syncSheet(state.sheetUrl);
+window.addEventListener('load',function(){try{renderChart();}catch(e){}});
+</script>
+</body>
+</html>
