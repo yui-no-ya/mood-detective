@@ -81,6 +81,12 @@
     <div class="ptitle"><span>コンディション予報</span><span id="pxStatus" class="status">気圧取得中…</span></div>
     <div id="forecast" class="fc"></div>
     <p id="fcNote" class="note" style="margin:12px 0 0;"></p>
+    <div id="planBox" style="margin-top:14px;border-top:1px solid var(--edge);padding-top:12px;">
+      <div class="note" style="margin-bottom:8px;">明日の予定を入れると<em style="color:var(--lav);font-style:normal">明日</em>の予報に反映：</div>
+      <label class="l">飲酒（今夜）</label><div class="row" id="planAlc"></div>
+      <label class="l" style="margin-top:8px;">睡眠</label><div class="row" id="planSleep"></div>
+      <div class="row" style="margin-top:10px;"><div class="chip" id="planDepas">デパス</div></div>
+    </div>
   </div>
 
   <!-- INPUT -->
@@ -122,12 +128,14 @@
     <p id="chartEmpty" class="note" style="display:none;">記録が2日分になるとグラフが出ます。</p>
   </div>
 
-  <!-- RANKING -->
+  <!-- DRIVERS -->
   <div class="panel">
-    <div class="ptitle"><span>容疑者ランキング（相関）</span></div>
-    <p class="note" style="margin:-4px 0 14px;">+は「高い日ほど気分が良い」、−は「高い日ほど下がる」。信頼できるのは
-      <span style="color:var(--amber)">2〜3週間</span> 溜まってから。</p>
+    <div class="ptitle"><span>ドライバー分析（全データ）</span></div>
+    <p class="note" style="margin:-4px 0 14px;">+は「高い日ほど気分が良い」、−は「高い日ほど下がる」。n＝突き合わせできた日数。信頼できるのは
+      <span style="color:var(--amber)">2〜3週間（1周期）</span> 溜まってから。</p>
     <div id="ranking"></div>
+    <div id="lagBox" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--edge);"></div>
+    <div id="phaseBox" style="margin-top:6px;"></div>
     <div id="rankCat" class="note" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--edge);line-height:1.7;"></div>
   </div>
 
@@ -174,6 +182,7 @@ const LS='moodDetective.v1', LS_URL='moodDetective.sheetUrl';
 let state={entries:[], sheetUrl:''};
 let pressureMap={}, overlay='pressure', chart=null;
 let draft={date:today(),mood:3,cycleDay:'',sleep:'',throat:0,bodyCond:0,alcohol:0,depas:false,exercise:false,periodStart:false,symptom:'',note:''};
+let plan={alcohol:null,sleep:null,depas:false};   // 明日の予定（予報に反映）
 
 function localYMD(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function parseYMD(s){const p=String(s).split('-').map(Number);return new Date(p[0],(p[1]||1)-1,p[2]||1);}
@@ -199,6 +208,83 @@ function pearson(pairs){
   return {r:sxy/Math.sqrt(sxx*syy),n};
 }
 const strength=r=>{const a=Math.abs(r);return a>=.6?'強い':a>=.35?'中くらい':a>=.15?'弱い':'ほぼなし';};
+const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+const stdev=a=>{if(a.length<2)return 0;const m=mean(a);return Math.sqrt(a.reduce((s,x)=>s+(x-m)**2,0)/a.length);};
+const DRIVER_LABEL={pressure:'気圧',pressureChange:'気圧変化',sleep:'睡眠',alcohol:'飲酒',cycle:'周期',bodyCond:'体調',throat:'喉',depas:'デパス'};
+function cyclePhaseOf(c){ if(c==null||isNaN(c))return null; if(c<=5)return 0; if(c<=13)return 1; if(c<=20)return 2; return 3; }
+const PHASE_LABEL=['生理期 1–5','卵胞期 6–13','排卵期 14–20','黄体後期 21–'];
+function moodBand(m){
+  if(m==null) return {txt:'—',col:C.ivoryDim};
+  if(m>=3.6) return {txt:'上向き',col:C.neon};
+  if(m>=2.8) return {txt:'ふつう',col:C.amber};
+  if(m>=2.2) return {txt:'やや低め',col:C.orange};
+  return {txt:'下がりやすい',col:C.danger};
+}
+/* ---------- personalized model（あなたの記録から学習） ---------- */
+function factorModel(){
+  const data=rows();
+  const moods=data.map(r=>r.mood).filter(v=>!isNaN(v));
+  const mM=mean(moods)??3, mS=stdev(moods)||1;
+  const F={};
+  ['pressure','pressureChange','sleep','alcohol','bodyCond','throat'].forEach(id=>{
+    const pairs=data.filter(r=>r[id]!=null&&!isNaN(r[id])&&!isNaN(r.mood)).map(r=>[Number(r[id]),Number(r.mood)]);
+    const {r,n}=pearson(pairs);
+    const vals=pairs.map(p=>p[0]);
+    F[id]={r,n,mean:mean(vals),std:stdev(vals)};
+  });
+  const phase={};
+  for(let p=0;p<4;p++){const ms=data.filter(r=>cyclePhaseOf(r.cycleDay)===p).map(r=>r.mood); phase[p]={mean:mean(ms),n:ms.length};}
+  const dep={yes:data.filter(r=>r.depas).map(r=>r.mood), no:data.filter(r=>!r.depas).map(r=>r.mood)};
+  return {data,mM,mS,F,phase,dep,nDays:data.length};
+}
+// 1つの将来日について、既知要因(known)＋予定(plan)から気分を予測
+function predictMood(M, known, plan){
+  const preds=[], drivers=[];
+  const useCont=(id,val)=>{
+    const f=M.F[id]; if(!f||f.n<5||f.r==null||Math.abs(f.r)<0.2||!f.std) return;
+    const z=(val-f.mean)/f.std;
+    const pm=M.mM + f.r*M.mS*z;
+    preds.push([pm, Math.abs(f.r)*Math.min(1,f.n/12)]);
+    const eff=f.r*z;
+    if(Math.abs(eff)>0.25) drivers.push({id, dir:eff<0?'↓':'↑', impact:eff});
+  };
+  if(known){
+    if(known.pressure!=null) useCont('pressure',known.pressure);
+    if(known.pressureChange!=null) useCont('pressureChange',known.pressureChange);
+  }
+  if(plan){
+    if(plan.sleep!=null&&plan.sleep!=='') useCont('sleep',Number(plan.sleep));
+    if(plan.alcohol!=null&&plan.alcohol!=='') useCont('alcohol',Number(plan.alcohol));
+    if(plan.depas){ const dy=mean(M.dep.yes); if(dy!=null&&M.dep.yes.length>=2){ preds.push([dy,Math.min(1,M.dep.yes.length/8)*0.6]); if(dy<M.mM-0.3)drivers.push({id:'depas',dir:'↓',impact:dy-M.mM}); else if(dy>M.mM+0.3)drivers.push({id:'depas',dir:'↑',impact:dy-M.mM}); } }
+  }
+  const ph=known?cyclePhaseOf(known.cycleDay):null;
+  if(ph!=null&&M.phase[ph]&&M.phase[ph].n>=2&&M.phase[ph].mean!=null){
+    preds.push([M.phase[ph].mean, Math.min(1,M.phase[ph].n/8)*0.8]);
+    const d=M.phase[ph].mean-M.mM;
+    if(Math.abs(d)>0.4) drivers.push({id:'cycle',dir:d<0?'↓':'↑',impact:d});
+  }
+  if(!preds.length) return {mood:null, drivers:[]};
+  const sw=preds.reduce((s,p)=>s+p[1],0)||1;
+  let mood=preds.reduce((s,p)=>s+p[0]*p[1],0)/sw;
+  mood=Math.max(1,Math.min(5,mood));
+  drivers.sort((a,b)=>Math.abs(b.impact)-Math.abs(a.impact));
+  return {mood, drivers:drivers.slice(0,3)};
+}
+function confidenceOf(n){
+  if(n<7) return {txt:'低（気圧中心で算出）',col:C.ivoryDim};
+  if(n<21) return {txt:'中（傾向が出はじめ）',col:C.amber};
+  return {txt:'高（あなたの傾向を反映）',col:C.neon};
+}
+// 翌日ラグ相関：要因[d] と 気分[d+1]（暦上の連続日のみ）
+function lagCorr(id){
+  const data=rows(); const pairs=[];
+  for(let i=0;i<data.length-1;i++){
+    const a=data[i], b=data[i+1];
+    if((parseYMD(b.date)-parseYMD(a.date))===86400000 && a[id]!=null && !isNaN(a[id]) && !isNaN(b.mood))
+      pairs.push([Number(a[id]), Number(b.mood)]);
+  }
+  return pearson(pairs);
+}
 
 /* ---------- derived data ---------- */
 function periodStarts(){return state.entries.filter(e=>e.periodStart).map(e=>e.date).sort();}
@@ -242,10 +328,9 @@ async function fetchPressure(){
 
 /* ---------- forecast ---------- */
 function buildForecast(){
-  const data=rows();
-  const learned=pearson(data.map(r=>[r.pressureChange,r.mood]));
+  const M=factorModel();
+  const data=M.data;
   const lastCyc=[...data].reverse().find(r=>r.cycleDay!=null);
-  const starts=periodStarts();
   const days=[]; const start=new Date();
   let prevP=pressureMap[fmt(new Date(start.getTime()-86400000))]??null;
   for(let i=0;i<=3;i++){
@@ -253,17 +338,21 @@ function buildForecast(){
     const p=pressureMap[key]??null;
     const change=(p!=null&&prevP!=null)?+(p-prevP).toFixed(1):null;
     if(p!=null) prevP=p;
-    let level='低', reason=[];
-    if(change!=null){
-      if(change<=-4){level='高';reason.push(`気圧が${change}hPaの急降下`);}
-      else if(change<=-1.5){level='中';reason.push(`気圧がやや低下(${change})`);}
-      else if(change>=3){reason.push(`気圧は回復傾向(+${change})`);}
-    }
     let cyc=cycleFor(key,null);
     if(cyc==null&&lastCyc){const d0=Math.round((dt-parseYMD(lastCyc.date))/86400000);cyc=lastCyc.cycleDay+d0;}
-    days.push({key,label:`${dt.getMonth()+1}/${dt.getDate()}`,p,change,level,cyc,isToday:i===0});
+    const known={pressure:p,pressureChange:change,cycleDay:cyc};
+    const pr=predictMood(M, known, i===1?plan:null);   // 予定は「明日」に反映
+    let band, drivers=pr.drivers, predMood=pr.mood;
+    if(predMood!=null){ band=moodBand(predMood); }
+    else {  // データ不足 → 気圧ヒューリスティックにフォールバック
+      if(change!=null&&change<=-4){band={txt:'下がりやすい',col:C.danger}; drivers=[{id:'pressureChange',dir:'↓'}];}
+      else if(change!=null&&change<=-1.5){band={txt:'やや低め',col:C.orange}; drivers=[{id:'pressureChange',dir:'↓'}];}
+      else if(change!=null&&change>=3){band={txt:'上向き',col:C.neon}; drivers=[{id:'pressureChange',dir:'↑'}];}
+      else band={txt:'ふつう',col:C.amber};
+    }
+    days.push({key,label:`${dt.getMonth()+1}/${dt.getDate()}`,p,change,cyc,isToday:i===0,predMood,band,drivers,planned:i===1});
   }
-  return {days,hasData:data.length>=5,learned:learned.r};
+  return {days, nDays:M.nDays, conf:confidenceOf(M.nDays)};
 }
 
 /* ---------- merge / import ---------- */
@@ -410,18 +499,24 @@ function renderInput(){
 }
 function renderForecast(){
   const f=buildForecast(); const host=$('forecast'); host.innerHTML='';
-  const col=l=>l==='高'?C.danger:l==='中'?C.amber:C.neon;
   f.days.forEach(d=>{
     const el=document.createElement('div'); el.className='fcell'+(d.isToday?' today':'');
-    el.innerHTML=`<div class="fday" style="${d.isToday?'color:'+C.lav:''}">${d.isToday?'今日':d.label}</div>
-      <div class="flv" style="color:${col(d.level)}">${d.level}</div>
-      <div class="fsm">${d.p!=null?Math.round(d.p)+'hPa':'—'}</div>
-      <div class="fsm" style="${d.change!=null&&d.change<0?'color:'+C.neon2:''}">${d.change!=null?(d.change>0?'+':'')+d.change:''}</div>`;
+    const tags=(d.drivers||[]).slice(0,2).map(x=>`${DRIVER_LABEL[x.id]||x.id}${x.dir||''}`).join(' ');
+    el.innerHTML=`<div class="fday" style="${d.isToday?'color:'+C.lav:''}">${d.isToday?'今日':d.label}${d.planned?' <span style="color:'+C.lav+'">·予定</span>':''}</div>
+      <div class="flv" style="color:${d.band.col};font-size:14px;line-height:1.2;">${d.band.txt}</div>
+      <div class="fsm" style="color:${C.ivory}">${d.predMood!=null?'予想 '+d.predMood.toFixed(1):''}</div>
+      <div class="fsm" style="min-height:14px;">${tags}</div>
+      <div class="fsm">${d.p!=null?Math.round(d.p)+'hPa':'—'}${d.change!=null?' <span style="color:'+(d.change<0?C.neon2:C.ivoryDim)+'">'+(d.change>0?'+':'')+d.change+'</span>':''}</div>`;
     host.appendChild(el);
   });
-  $('fcNote').innerHTML='注意度は気圧の急降下を基準に算出（高＝予定を詰めすぎない日にすると吉）。'
-    +(f.hasData?'あなたの記録の傾向も参照中。':'記録が5日を超えると、あなた自身の傾向で精度が上がる。')
-    +(f.days.some(x=>x.cyc!=null)?' 周期は最後の入力からの概算。':'');
+  $('fcNote').innerHTML=`<span style="color:${f.conf.col}">信頼度: ${f.conf.txt}</span>（記録 ${f.nDays}日）。`
+    +'これは断定ではなく「あなたの記録だとこう傾きやすい」傾向。気圧・周期は自動、飲酒/睡眠/デパスは下の“明日の予定”を入れると明日の予報に反映される。';
+  renderPlan();
+}
+function renderPlan(){
+  const a=$('planAlc'); if(a){ a.innerHTML=''; ['なし','少し','ほどほど','多め'].forEach((lab,t)=>a.appendChild(chip(t+'·'+lab,plan.alcohol===t,C.orange,()=>{plan.alcohol=plan.alcohol===t?null:t;renderForecast();}))); }
+  const s=$('planSleep'); if(s){ s.innerHTML=''; [['寝不足',5],['ふつう',7],['たっぷり',8.5]].forEach(([lab,h])=>s.appendChild(chip(lab,plan.sleep===h,'#8FB7E8',()=>{plan.sleep=plan.sleep===h?null:h;renderForecast();}))); }
+  const d=$('planDepas'); if(d){ d.className='chip'+(plan.depas?' on':''); d.textContent=plan.depas?'デパス予定 ✓':'デパス'; d.style.borderColor=plan.depas?C.neon2:C.edge; d.style.background=plan.depas?C.neon2+'22':'transparent'; d.onclick=()=>{plan.depas=!plan.depas;renderForecast();}; }
 }
 function renderChart(){
   const data=rows(); const empty=$('chartEmpty');
@@ -453,8 +548,9 @@ function renderOverlayRow(){
   const host=$('overlayRow'); host.innerHTML='';
   SUSPECTS.forEach(s=>host.appendChild(chip(s.short,overlay===s.id,s.color,()=>{overlay=s.id;renderOverlayRow();renderChart();})));
 }
-function renderRanking(){
+function renderDrivers(){
   const data=rows();
+  // 同日相関
   const out=SUSPECTS.map(s=>{const {r,n}=pearson(data.map(row=>[row[s.id],row.mood]));return {...s,r,n};});
   out.sort((a,b)=>Math.abs(b.r??-1)-Math.abs(a.r??-1));
   const host=$('ranking'); host.innerHTML='';
@@ -462,17 +558,38 @@ function renderRanking(){
     const row=document.createElement('div'); row.className='rrow';
     let right;
     if(s.r==null) right=`<div style="font-size:12px;color:${C.ivoryDim}">データ不足（${s.n}/3日）</div>`;
-    else right=`<div style="font-size:12px;color:${C.ivoryDim}">${strength(s.r)}</div>
+    else right=`<div style="font-size:12px;color:${C.ivoryDim}">${strength(s.r)}・n${s.n}</div>
       <div style="width:56px;text-align:right;font-weight:700;color:${s.r>0?C.neon:C.danger}">${s.r>0?'+':''}${s.r.toFixed(2)}</div>`;
     row.innerHTML=`<div class="dot" style="background:${s.color}"></div><div style="flex:1">${s.label}</div>${right}`;
     host.appendChild(row);
   });
-  // categorical
+  // 翌日ラグ
+  const lagBox=$('lagBox');
+  if(lagBox){
+    const rowsL=['alcohol','pressureChange','sleep','bodyCond','throat'].map(id=>({id,...lagCorr(id)})).filter(x=>x.r!=null).sort((a,b)=>Math.abs(b.r)-Math.abs(a.r));
+    let h=`<div class="note" style="margin-bottom:6px;color:${C.lav}">翌日への持ち越し（前日の値 → 翌日の気分）</div>`;
+    if(!rowsL.length) h+='<div class="note">連続した日の記録が増えると出ます。</div>';
+    else rowsL.forEach(x=>{ h+=`<div class="lrow" style="border-top:none;padding:4px 0;"><div style="flex:1">前日の${DRIVER_LABEL[x.id]||x.id}</div><div style="font-size:12px;color:${C.ivoryDim}">${strength(x.r)}・n${x.n}</div><div style="width:56px;text-align:right;font-weight:700;color:${x.r>0?C.neon:C.danger}">${x.r>0?'+':''}${x.r.toFixed(2)}</div></div>`; });
+    lagBox.innerHTML=h;
+  }
+  // 周期フェーズ
+  const phaseBox=$('phaseBox');
+  if(phaseBox){
+    const phs=[0,1,2,3].map(p=>{const ms=data.filter(r=>cyclePhaseOf(r.cycleDay)===p).map(r=>r.mood);return {p,mean:mean(ms),n:ms.length};});
+    const withData=phs.filter(x=>x.mean!=null);
+    let h=`<div class="note" style="margin:10px 0 6px;color:${C.lav}">周期フェーズ別の平均気分（谷の位置）</div>`;
+    if(!withData.length) h+='<div class="note">🩸生理初日をマークすると周期が計算され、ここに出ます。</div>';
+    else { const lo=Math.min(...withData.map(x=>x.mean));
+      phs.forEach(x=>{ h+=`<div class="lrow" style="border-top:none;padding:4px 0;"><div style="flex:1">${PHASE_LABEL[x.p]}</div>`+(x.mean!=null?`<div style="width:52px;text-align:right;font-weight:700;color:${x.mean===lo&&withData.length>1?C.danger:C.ivory}">${x.mean.toFixed(1)}${x.mean===lo&&withData.length>1?' ▼':''}</div><div style="font-size:11px;color:${C.ivoryDim};width:34px;text-align:right">n${x.n}</div>`:`<div style="width:86px;text-align:right;font-size:12px;color:${C.ivoryDim}">—</div>`)+`</div>`; });
+    }
+    phaseBox.innerHTML=h;
+  }
+  // categorical（デパス／運動）
   const dep={yes:[],no:[]}; data.forEach(r=>dep[r.depas?'yes':'no'].push(r.mood));
-  const mean=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(1):'—';
+  const mn=a=>a.length?(a.reduce((x,y)=>x+y,0)/a.length).toFixed(1):'—';
   const exR=pearson(data.map(r=>[r.exercise?1:0,r.mood])).r;
   let cat='';
-  cat+= dep.yes.length?`デパス飲んだ日 平均 ${mean(dep.yes)} ／ 飲まない日 ${mean(dep.no)}<br>`:'デパスの比較は記録が溜まると出ます<br>';
+  cat+= dep.yes.length?`デパス飲んだ日 平均 ${mn(dep.yes)}（${dep.yes.length}日） ／ 飲まない日 ${mn(dep.no)}<br>`:'デパスの比較は記録が溜まると出ます<br>';
   if(exR!=null) cat+=`運動と気分：${exR>0?'+':''}${exR.toFixed(2)}`;
   $('rankCat').innerHTML=cat;
 }
@@ -490,7 +607,7 @@ function renderLog(){
     row.appendChild(b); host.appendChild(row);
   });
 }
-function renderAll(){[renderForecast,renderChart,renderOverlayRow,renderRanking,renderLog].forEach(function(f){try{f();}catch(e){console.error(e);}});}
+function renderAll(){[renderForecast,renderChart,renderOverlayRow,renderDrivers,renderLog].forEach(function(f){try{f();}catch(e){console.error(e);}});}
 
 /* ---------- events ---------- */
 function bind(){
